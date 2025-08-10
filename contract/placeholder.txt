@@ -1,0 +1,237 @@
+/**
+ *Submitted for verification at BscScan.com on 2025-08-10
+*/
+
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+/* ---------- Ownable (минимальный) ---------- */
+contract Ownable {
+    address private _owner;
+    event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
+    constructor(address initialOwner) { _transferOwnership(initialOwner); }
+    modifier onlyOwner() { require(msg.sender == _owner, "Ownable: caller is not the owner"); _; }
+    function owner() public view returns (address) { return _owner; }
+    function transferOwnership(address newOwner) public onlyOwner {
+        require(newOwner != address(0), "Ownable: zero");
+        _transferOwnership(newOwner);
+    }
+    function renounceOwnership() public onlyOwner { _transferOwnership(address(0)); }
+    function _transferOwnership(address newOwner) internal {
+        address old = _owner; _owner = newOwner; emit OwnershipTransferred(old, newOwner);
+    }
+}
+
+/* ---------- ERC20 (минимальный) ---------- */
+contract ERC20 {
+    mapping(address => uint256) internal _balances;
+    mapping(address => mapping(address => uint256)) private _allowances;
+    uint256 internal _totalSupply;
+    string private _name; string private _symbol;
+    event Transfer(address indexed from, address indexed to, uint256 value);
+    event Approval(address indexed owner, address indexed spender, uint256 value);
+
+    constructor(string memory n, string memory s) { _name = n; _symbol = s; }
+    function name() public view returns (string memory) { return _name; }
+    function symbol() public view returns (string memory) { return _symbol; }
+    function decimals() public pure returns (uint8) { return 18; }
+    function totalSupply() public view returns (uint256) { return _totalSupply; }
+    function balanceOf(address a) public view returns (uint256) { return _balances[a]; }
+    function transfer(address to, uint256 amount) public returns (bool) { _transfer(msg.sender,to,amount); return true; }
+    function allowance(address o, address s) public view returns (uint256){ return _allowances[o][s]; }
+    function approve(address s, uint256 a) public returns (bool){ _approve(msg.sender,s,a); return true; }
+    function transferFrom(address f, address t, uint256 a) public returns (bool){
+        uint256 cur=_allowances[f][msg.sender]; require(cur>=a,"ERC20: insufficient allowance");
+        unchecked{ _approve(f,msg.sender,cur-a); } _transfer(f,t,a); return true;
+    }
+    function _transfer(address f,address t,uint256 a) internal {
+        require(f!=address(0)&&t!=address(0),"ERC20: zero");
+        uint256 b=_balances[f]; require(b>=a,"ERC20: balance");
+        unchecked{ _balances[f]=b-a; } _balances[t]+=a; emit Transfer(f,t,a);
+    }
+    function _approve(address o,address s,uint256 a) internal {
+        require(o!=address(0)&&s!=address(0),"ERC20: zero");
+        _allowances[o][s]=a; emit Approval(o,s,a);
+    }
+    function _mint(address to,uint256 a) internal {
+        require(to!=address(0),"ERC20: mint zero"); _totalSupply+=a; _balances[to]+=a; emit Transfer(address(0),to,a);
+    }
+    function _burn(address from,uint256 a) internal {
+        require(from!=address(0),"ERC20: burn zero"); uint256 b=_balances[from]; require(b>=a,"ERC20: burn");
+        unchecked{ _balances[from]=b-a; _totalSupply-=a; } emit Transfer(from,address(0),a);
+    }
+}
+
+/* ---------- Chainlink V3 Aggregator (интерфейс) ---------- */
+interface AggregatorV3Interface {
+    function decimals() external view returns (uint8);
+    function latestRoundData() external view returns (
+        uint80 roundId, int256 answer, uint256 startedAt, uint256 updatedAt, uint80 answeredInRound
+    );
+}
+
+/* ---------- Chainlink Automation (интерфейс) ---------- */
+interface AutomationCompatibleInterface {
+    function checkUpkeep(bytes calldata checkData) external returns (bool upkeepNeeded, bytes memory performData);
+    function performUpkeep(bytes calldata performData) external;
+}
+
+/* ============================================================
+                 ARMENIAN DRAM GOLD COIN (AMDC)
+   Rebase к XAU/USD. Интервал по умолчанию — 5 минут.
+   Сеттеры: interval, maxStep, burnFee, treasury.
+   XAU/USD feed (BNB Mainnet, 8 decimals): 0x86896fEB19D8A607c3b11f2aF50A0f239Bd71CD0
+   Treasury: 0x135E3360bb010e9216f03F45E961F4214E50Bf83
+============================================================ */
+contract ARMENIAN_DRAM_GOLD_COIN is ERC20, Ownable, AutomationCompatibleInterface {
+    // выпуск
+    uint256 public constant INITIAL_SUPPLY = 100_000_000_000 * 10**18; // 100 млрд
+
+    // оракул
+    AggregatorV3Interface public goldPriceFeed;
+    uint256 public targetGoldPrice; // 8 decimals
+    uint256 public lastRebaseAt;
+
+    // параметры
+    address public treasury = 0x135E3360bb010e9216f03F45E961F4214E50Bf83;
+    uint16  public burnFeeBps     = 500;   // 5% владельцу при снижении
+    uint16  public maxStepBps     = 2000;  // макс. шаг ребейза (±20%)
+    uint256 public minRebaseInterval = 300; // * 5 минут по умолчанию *
+
+    // события
+    event Rebased(uint256 oldSupply, uint256 newSupply, uint256 priceUsed, bool minted);
+    event TargetPriceSet(uint256 price);
+    event ParamsChanged(string key, uint256 value);
+    event AddressChanged(string key, address value);
+
+    constructor()
+        ERC20("ARMENIAN DRAM GOLD COIN", "AMDC")
+        Ownable(msg.sender)
+    {
+        goldPriceFeed = AggregatorV3Interface(0x86896fEB19D8A607c3b11f2aF50A0f239Bd71CD0);
+        require(goldPriceFeed.decimals() == 8, "feed must be 8 decimals");
+        _mint(msg.sender, INITIAL_SUPPLY);
+
+        uint256 p = _getOraclePrice();
+        targetGoldPrice = p;
+        lastRebaseAt = block.timestamp;
+        emit TargetPriceSet(p);
+    }
+
+    /* ------------ VIEW ------------ */
+    function getCurrentGoldPrice() external view returns (uint256) { return _getOraclePrice(); }
+
+    /* --------- PUBLIC ACTIONS --------- */
+    function updateFromOracle() external {
+        _rebaseWithPrice(_getOraclePrice());
+    }
+
+    /* --------- Chainlink Automation --------- */
+    function checkUpkeep(bytes calldata)
+        external
+        override
+        returns (bool upkeepNeeded, bytes memory performData)
+    {
+        bool intervalOk = block.timestamp >= lastRebaseAt + minRebaseInterval;
+        uint256 current = _safeOraclePrice();
+        uint256 target  = targetGoldPrice;
+
+        if (target == 0) return (intervalOk, abi.encode(current));
+        uint256 diff = current > target ? current - target : target - current;
+
+        // ребейз нужен, если прошло время И есть отличия, и шаг не больше maxStep
+        bool moved = (diff > 0) && (diff * 10_000 <= target * maxStepBps);
+        upkeepNeeded = intervalOk && moved;
+        performData  = abi.encode(current);
+    }
+
+    function performUpkeep(bytes calldata performData) external override {
+        uint256 price = abi.decode(performData, (uint256));
+        if (price == 0) price = _safeOraclePrice();
+        _rebaseWithPrice(price);
+    }
+
+    /* ------------- ADMIN (owner) ------------- */
+    function setMinRebaseInterval(uint256 s) external onlyOwner {
+        require(s >= 60 && s <= 86400, "bad interval");
+        minRebaseInterval = s; emit ParamsChanged("minRebaseInterval", s);
+    }
+
+    function setMaxStepBps(uint16 bps) external onlyOwner {
+        require(bps > 0 && bps <= 5000, "bad bps"); // до 50%
+        maxStepBps = bps; emit ParamsChanged("maxStepBps", bps);
+    }
+
+    function setBurnFeeBps(uint16 bps) external onlyOwner {
+        require(bps <= 2000, "fee too big"); // до 20%
+        burnFeeBps = bps; emit ParamsChanged("burnFeeBps", bps);
+    }
+
+    function setTreasury(address t) external onlyOwner {
+        require(t != address(0), "zero");
+        treasury = t; emit AddressChanged("treasury", t);
+    }
+
+    /* ------------- INTERNAL ------------- */
+    function _getOraclePrice() internal view returns (uint256) {
+        (, int256 ans,, uint256 updatedAt,) = goldPriceFeed.latestRoundData();
+        require(ans > 0, "invalid price");
+        require(updatedAt > 0, "stale price");
+        return uint256(ans); // 8 decimals
+    }
+
+    function _safeOraclePrice() internal view returns (uint256) {
+        (, int256 ans,, ,) = goldPriceFeed.latestRoundData();
+        if (ans <= 0) return targetGoldPrice;
+        return uint256(ans);
+    }
+
+    function _rebaseWithPrice(uint256 currentPrice) internal {
+        require(block.timestamp >= lastRebaseAt + minRebaseInterval, "too frequent");
+
+        uint256 _target = targetGoldPrice;
+        if (_target == 0) {
+            targetGoldPrice = currentPrice;
+            lastRebaseAt = block.timestamp;
+            emit TargetPriceSet(currentPrice);
+            return;
+        }
+
+        // ограничиваем шаг
+        uint256 diff = currentPrice > _target ? currentPrice - _target : _target - currentPrice;
+        require(diff * 10_000 <= _target * maxStepBps, "step too large");
+        if (diff == 0) { lastRebaseAt = block.timestamp; return; }
+
+        uint256 oldSupply = _totalSupply;
+        uint256 newSupply = (oldSupply * currentPrice) / _target;
+
+        if (newSupply > oldSupply) {
+            // цена ↑ → минтим разницу в казну
+            uint256 toMint = newSupply - oldSupply;
+            _mint(treasury, toMint);
+            emit Rebased(oldSupply, newSupply, currentPrice, true);
+        } else {
+            // цена ↓ → жжём из казны, % владельцу
+            uint256 toReduce   = oldSupply - newSupply;
+            uint256 feeToOwner = (toReduce * burnFeeBps) / 10_000;
+            uint256 burnAmount = toReduce - feeToOwner;
+
+            uint256 treasBal = _balances[treasury];
+
+            uint256 payOwner = feeToOwner <= treasBal ? feeToOwner : treasBal;
+            if (payOwner > 0) {
+                _transfer(treasury, owner(), payOwner);
+                treasBal -= payOwner;
+            }
+            uint256 burnFromTreasury = burnAmount <= treasBal ? burnAmount : treasBal;
+            if (burnFromTreasury > 0) {
+                _burn(treasury, burnFromTreasury);
+            }
+            emit Rebased(oldSupply, _totalSupply, currentPrice, false);
+        }
+
+        targetGoldPrice = currentPrice;
+        lastRebaseAt = block.timestamp;
+        emit TargetPriceSet(currentPrice);
+    }
+}
