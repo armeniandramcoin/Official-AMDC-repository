@@ -1,0 +1,7 @@
+{
+  "network": "bsc-mainnet",
+  "amdc": "0x74E4Bd21e8437c3ed2494bCE98CdeC7AFAA3da1B",
+  "priceFeedXAUUSD": "0x86896fEB19D8A607c3b11f2aF50A0f239Bd71CD0",
+  "chainlinkRegistryV2_1": "0xDc2E1e2799348F6721CaDFDd112Dafb3261f09AC",
+  "upkeepId": "319633...8449"  // укажи точное значение из UI
+}
