@@ -4,12 +4,12 @@
 - Upkeep type: Custom logic
 - Target contract: 0x74E4Bd21e8437c3ed2494bCE98CdeC7AFAA3da1B
 - Gas limit: 500,000
-- LINK funding: см. баланс в UI
-- Trigger: ребейз выполняется, если:
-  - прошло minRebaseInterval (по умолчанию 65 сек)
-  - абсолютное отклонение цены от targetGoldPrice > 0
-  - шаг не превышает maxStepBps
+- LINK funding: see balance in UI
+- Trigger: rebase is performed if:
+  - minRebaseInterval has passed (default 65 sec)
+  - absolute deviation of price from targetGoldPrice > 0
+  - step does not exceed maxStepBps
 
 ## Manual poke
-- updateFromOracle() — берёт цену из оракула и ребейзит.
-- performUpkeep(bytes) — ребейз с переданной ценой (используется Automation).
+- updateFromOracle() — takes price from oracle and rebasizes.
+- performUpkeep(bytes) — rebasizes with passed price (uses Automation).
