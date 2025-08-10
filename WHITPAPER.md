@@ -1,24 +1,26 @@
 # AMDC — Armenian Dram Gold Coin
 
-Идея. Токен с плавающим предложением (rebase), ориентированный на цену золота (XAU/USD). 
-Цель: удерживать внутричейн цену *через общее предложение*, а не через торговые книги.
+Idea. A token with a floating supply (rebase) based on the price of gold (XAU/USD). 
+Goal: to maintain the price within the chain *through total supply* rather than through trading books.
 
-## Механизм
+## Mechanism
 - Oracle: Chainlink XAU/USD (8 decimals).
-- Каждое срабатывание:
-  - Если price > target → минт разницы в казну (treasury).
-  - Если price < target → сжигание из казны и выплата владельцу процента burnFeeBps.
-  - Обновление targetGoldPrice = price.
-- Ограничение шага: maxStepBps (по умолчанию 2000 = 20%).
-- Минимальный интервал между ребейзами: minRebaseInterval (по умолчанию 65 сек).
+- Each trigger:
+  - If price > target → mint the difference to the treasury.
+  - If price < target → burn from the treasury and pay the owner the burnFeeBps percentage.
+  - Update targetGoldPrice = price.
+- Step limit: maxStepBps (default 2000 = 20%).
+- Minimum interval between rebases: minRebaseInterval (default 65 sec).
 
-## Риски
-- Риск оракула и редких больших ценовых гэпов (ограничено maxStepBps).
-- Требуется достаточный баланс казны для снижения поставки.
-- Внешние рынки/пулы ликвидности могут давать цену, отличную от целевой, до следующего ребейза.
+## Risks
+- Oracle risk and rare large price gaps (limited by maxStepBps).
+- Sufficient treasury balance is required to reduce supply.
+- External markets/liquidity pools may provide a price different from the target price until the next rebase.
 
-## Управляемые параметры (owner)
-- setMinRebaseInterval(uint256 s) — 60…86400 сек.
-- setMaxStepBps(uint16 bps) — 1…5000 б.п.
-- setBurnFeeBps(uint16 bps) — максимум 2000 б.п.
+## Controllable parameters (owner)
+- setMinRebaseInterval(uint256 s) — 60…86400 sec.
+- setMaxStepBps(uint16 bps) — 1…5000 bps.
+- setBurnFeeBps(uint16 bps) — maximum 2000 bps.
 - setTreasury(address t).
+
+Translated with DeepL.com (free version)
