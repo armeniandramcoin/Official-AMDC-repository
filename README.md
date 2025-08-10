@@ -2,31 +2,31 @@
 
 > Stable-style rebase token pegged to gold (XAU/USD) via Chainlink oracle.
 
-- Network: BNB Chain (mainnet)  
+- Network: BNB Chain (mainnet)
 - Contract: 0x74E4Bd21e8437c3ed2494bCE98CdeC7AFAA3da1B  
 - Oracle (XAU/USD, 8 decimals): 0x86896fEB19D8A607c3b11f2aF50A0f239Bd71CD0  
 - Automation: Chainlink Automation v2.1 (Custom Logic)
 
 ---
 
-## 📌 Как это работает
-- Каждое срабатывание ребейза сравнивает цену оракула с targetGoldPrice.
-- Если цена выросла → минт в казну (treasury).
-- Если цена упала → сжигание из казны, владелец получает процент burnFeeBps.
-- Ограничение шага: maxStepBps.
-- Минимальный интервал между ребейзами: minRebaseInterval.
+## 📌 How it works
+- Each rebase triggers a comparison of the oracle price with targetGoldPrice.
+- If the price has risen → mint to the treasury.
+- If the price has fallen → burn from the treasury, the owner receives a percentage of burnFeeBps.
+- Step limit: maxStepBps.
+- Minimum interval between rebases: minRebaseInterval.
 
 ---
 
-## 🔧 Ключевые параметры (Owner)
-- setMinRebaseInterval(uint256 s) — по умолчанию 300 сек (5 минут).
-- setMaxStepBps(uint16 bps) — по умолчанию 2000 (20%), максимум 5000.
-- setBurnFeeBps(uint16 bps) — максимум 2000 (20%).
+## 🔧 Key parameters (Owner)
+- setMinRebaseInterval(uint256 s) — default 300 sec (5 minutes).
+- setMaxStepBps(uint16 bps) — default 2000 (20%), maximum 5000.
+- setBurnFeeBps(uint16 bps) — maximum 2000 (20%).
 - setTreasury(address t).
 
 ---
 
-## 📊 События
+## 📊 Events
 - Rebased(uint256 oldSupply, uint256 newSupply, uint256 priceUsed, bool minted)
 - TargetPriceSet(uint256 price)
 - ParamsChanged(string key, uint256 value)
@@ -34,16 +34,16 @@
 
 ---
 
-## 📂 Структура репозитория
-- contracts/ — смарт-контракты
-- addresses/ — адреса в разных сетях
-- automation/ — настройки Chainlink Automation
-- docs/ — токеномика, whitepaper, oracle
-- abi/ — ABI контрактов
+## 📂 Repository Structure
+- contracts/ — smart contracts
+- addresses/ — addresses on different networks
+- automation/ — Chainlink Automation settings
+- docs/ — tokenomics, whitepaper, oracle
+- abi/ — contract ABIs
 
 ---
 
-## 🛠 Сборка и тест (Hardhat)
+## 🛠 Build and test (Hardhat)
 `bash
 npm install
 npx hardhat compile
@@ -66,9 +66,3 @@ Automation: Chainlink Automation v2.1 (Custom Logic)
 
 ---
 
-## 📂 Repository Structure
-
-- /contract — исходный код смарт-контракта AMDC  
-- /addresses — JSON с адресами контракта, оракула и automation  
-- /automation — инструкции по настройке Chainlink Upkeep  
-- /docs — полная документация по AMDC
